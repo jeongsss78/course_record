@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>교원 연수 이수현황</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --bg: #f2f5f7; --surface: #ffffff; --ink: #1c2833; --muted: #5d6d7a;
+    --line: #d6dde3; --head: #2e7d5b; --accent: #2e7d5b; --accent-ink: #ffffff;
+    --danger: #b3382c; --warn-bg: #fff4d6; --ok-bg: #dff3ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12181d; --surface: #1b242b; --ink: #e8eef2; --muted: #9aabb8;
+      --line: #2e3b45; --head: #245f46; --accent: #5cc08f; --accent-ink: #0b1f16;
+      --danger: #ef7d70; --warn-bg: #3b3317; --ok-bg: #173a2d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 "Noto Sans KR", system-ui, sans-serif; }
+  .topbar { background: var(--head); color: #fff; }
+  .topbar .in { max-width: 960px; margin: 0 auto; padding: 24px 16px 0; }
+  .brand { font-size: 1.75rem; font-weight: 700; line-height: 1.3; }
+  .sub { margin: 4px 0 20px; font-size: 1rem; opacity: .92; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav a { padding: 12px 20px; font-size: 1.1rem; font-weight: 700; color: #fff;
+    text-decoration: none; border-radius: 12px 12px 0 0; }
+  nav a:hover { background: rgba(255,255,255,.14); }
+  nav a.on { background: var(--bg); color: var(--accent); }
+  @media (max-width: 520px) {
+    .brand { font-size: 1.4rem; }
+    nav a { padding: 10px 13px; font-size: 1rem; }
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  section { background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+  .lead { color: var(--muted); margin: 0 0 16px; }
+  .form { max-width: 440px; }
+  .form > div { margin-bottom: 14px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr 1fr 1fr auto auto; align-items: end; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+  label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=date], input[type=password], select {
+    width: 100%; padding: 11px 10px; font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { font: inherit; font-weight: 500; padding: 10px 16px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.danger { color: var(--danger); border-color: var(--danger); }
+  button.small { padding: 5px 10px; font-size: .85rem; }
+  button:disabled { opacity: .45; cursor: default; }
+  .form button.primary { width: 100%; padding: 12px; }
+  .hint { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+  .msg { padding: 10px 12px; border-radius: 6px; margin-top: 12px; display: none; }
+  .msg.ok { background: var(--ok-bg); display: block; }
+  .msg.warn { background: var(--warn-bg); display: block; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.course { white-space: normal; min-width: 200px; }
+  th { font-size: .85rem; color: var(--muted); font-weight: 500; }
+  th.sort { cursor: pointer; user-select: none; }
+  tr.cancelled td { color: var(--muted); text-decoration: line-through; }
+  tr.cancelled td:last-child { text-decoration: none; }
+  .tag { font-size: .75rem; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); }
+  .summary { color: var(--muted); margin: 0 0 8px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .row .grow { flex: 1; min-width: 180px; }
+  .row label.inline { display: inline; margin: 0; color: var(--ink); font-size: 1rem; }
+  .empty { text-align: center; color: var(--muted); padding: 28px 0; }
+  dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 420px; width: 90%; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ====== 설정: Supabase > Project Settings > API 에서 복사 ====== -->
+<script>
+  const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
+  const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+</script>
+
+<div class="topbar"><div class="in">
+  <div class="brand">🏫 교원 연수 이수현황</div>
+  <p class="sub">원격연수 이수 내용을 직접 등록하고 확인합니다.</p>
+  <nav>
+    <a href="#register" data-tab="register">이수 등록</a>
+    <a href="#mine" data-tab="mine">내 이수 현황</a>
+    <a href="#overview" data-tab="overview">전체 현황</a>
+    <a href="#admin" data-tab="admin">연수 담당자</a>
+  </nav>
+</div></div>
+
+<main>
+  <!-- ===== 1. 이수 등록 (첫 화면) ===== -->
+  <div id="tab-register" class="hidden">
+    <section>
+      <h1>연수 이수 등록</h1>
+      <p class="lead">원격연수를 마친 선생님은 아래에 이수 내용을 입력해 주세요.</p>
+      <div class="form">
+        <div><label for="rName">이름</label>
+          <input id="rName" type="text" maxlength="10" autocomplete="off" placeholder="예: 홍길동"></div>
+        <div><label for="rPin">비밀번호 (숫자 4자리)</label>
+          <input id="rPin" class="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+          <div class="hint">‘내 이수 현황’ 조회에 쓰입니다. 다음에도 같은 이름과 비밀번호로 등록해 주세요.</div></div>
+        <div><label for="rCourse">이수한 연수 과정</label>
+          <select id="rCourse"><option value="">과정을 선택하세요</option></select></div>
+        <div><label for="rDate">이수 날짜</label>
+          <input id="rDate" type="date"></div>
+        <button class="primary" id="btnSubmit">등록하기</button>
+        <div id="rMsg" class="msg"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== 2. 내 이수 현황 ===== -->
+  <div id="tab-mine" class="hidden">
+    <section>
+      <h1>내 이수 현황</h1>
+      <p class="lead">이수 등록 때 입력한 이름과 비밀번호를 입력하면 내 기록을 볼 수 있습니다.</p>
+      <div class="form">
+        <div><label for="mName">이름</label>
+          <input id="mName" type="text" maxlength="10" autocomplete="off"></div>
+        <div><label for="mPin">비밀번호 (숫자 4자리)</label>
+          <input id="mPin" class="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+        <button class="primary" id="btnMine">조회하기</button>
+        <div id="mMsg" class="msg"></div>
+      </div>
+    </section>
+    <section id="mResult" class="hidden">
+      <p class="summary" id="mSummary"></p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>연수 과정</th><th>이수일</th></tr></thead>
+        <tbody id="mRows"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- ===== 3. 전체 현황 (이름 마스킹) ===== -->
+  <div id="tab-overview" class="hidden">
+    <section>
+      <h1>전체 이수 현황</h1>
+      <p class="lead">개인정보 보호를 위해 이름의 가운데 글자는 *로 표시됩니다.</p>
+      <div class="row" style="margin-top:0">
+        <div class="grow"><label for="oCourse">연수 과정</label>
+          <select id="oCourse"><option value="">전체 과정</option></select></div>
+      </div>
+    </section>
+    <section>
+      <p class="summary" id="oSummary"></p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>이름</th><th>연수 과정</th><th>이수일</th></tr></thead>
+        <tbody id="oRows"></tbody>
+      </table></div>
+      <div id="oEmpty" class="empty hidden">등록된 이수 기록이 없습니다.</div>
+      <div class="row">
+        <button id="oPrev" class="small">이전</button>
+        <span id="oPageInfo"></span>
+        <button id="oNext" class="small">다음</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== 4. 연수 담당자 ===== -->
+  <div id="tab-admin" class="hidden">
+    <section id="adminLogin" class="hidden">
+      <h1>연수 담당자</h1>
+      <p class="lead">담당자 비밀번호를 입력하면 실명 조회와 기록 관리를 할 수 있습니다.</p>
+      <div class="form">
+        <div><label for="password">비밀번호</label>
+          <input id="password" type="password" autocomplete="off"></div>
+        <button class="primary" id="btnLogin">확인</button>
+        <div id="loginMsg" class="msg"></div>
+      </div>
+    </section>
+
+    <div id="adminPanel" class="hidden">
+      <div class="row" style="justify-content:space-between;margin:0 0 12px">
+        <h1 style="margin:0">연수 담당자 관리</h1>
+        <button id="btnLogout" class="small">나가기</button>
+      </div>
+
+      <section>
+        <h2>연수 과정 관리</h2>
+        <div class="row" style="margin-top:0">
+          <div class="grow"><label for="newCourse">새 연수 과정 이름</label>
+            <input id="newCourse" type="text"></div>
+          <button class="primary" id="btnAddCourse">과정 추가</button>
+        </div>
+        <div id="cMsg" class="msg"></div>
+        <div class="tablewrap" style="margin-top:12px"><table>
+          <tbody id="cRows"></tbody>
+        </table></div>
+      </section>
+
+      <section>
+        <h2>이수 기록 검색</h2>
+        <div class="grid">
+          <div><label for="sName">교원 이름</label><input id="sName" type="text"></div>
+          <div><label for="sCourse">연수명</label><input id="sCourse" type="text"></div>
+          <div><label for="sFrom">이수일 시작</label><input id="sFrom" type="date"></div>
+          <div><label for="sTo">이수일 끝</label><input id="sTo" type="date"></div>
+          <button class="primary" id="btnSearch">검색</button>
+          <button id="btnReset">초기화</button>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="sCancelled"><label class="inline" for="sCancelled">취소된 기록 포함</label>
+        </div>
+      </section>
+
+      <section>
+        <p class="summary" id="summary"></p>
+        <div class="tablewrap"><table>
+          <thead><tr>
+            <th class="sort" data-col="teacher_name">이름 ↕</th>
+            <th class="sort" data-col="course_title">연수명 ↕</th>
+            <th class="sort" data-col="completed_date">이수일 ↕</th>
+            <th>상태</th><th></th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+        <div id="empty" class="empty hidden">조건에 맞는 기록이 없습니다.</div>
+        <div class="row">
+          <button id="btnPrev" class="small">이전</button>
+          <span id="pageInfo"></span>
+          <button id="btnNext" class="small">다음</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <dialog id="dlgCancel">
+    <h2>기록을 취소할까요?</h2>
+    <p id="cancelText" class="summary"></p>
+    <label for="cancelReason">취소 사유 (선택)</label>
+    <input id="cancelReason" type="text">
+    <div class="row">
+      <button class="danger" id="btnCancelOk">기록 취소</button>
+      <button id="btnCancelClose">닫기</button>
+    </div>
+  </dialog>
+</main>
+
+<script>
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+const today = () => new Date().toLocaleDateString("sv-SE");
+const cleanName = (s) => s.replace(/\s+/g, "");
+function show(el, text, kind) { el.textContent = text; el.className = "msg " + kind; }
+function clearMsg(el) { el.className = "msg"; el.textContent = ""; }
+
+// 비밀번호 칸에는 숫자만 입력
+document.querySelectorAll("input.pin").forEach(i =>
+  i.addEventListener("input", () => { i.value = i.value.replace(/\D/g, "").slice(0, 4); }));
+
+/* ---------- 탭 이동 ---------- */
+const TABS = ["register", "mine", "overview", "admin"];
+async function route(forced) {
+  const h = location.hash.slice(1);
+  const tab = TABS.includes(forced) ? forced : (TABS.includes(h) ? h : "register");
+  TABS.forEach(t => {
+    $("tab-" + t).classList.toggle("hidden", t !== tab);
+    document.querySelector(`nav a[data-tab="${t}"]`).classList.toggle("on", t === tab);
+  });
+  if (tab === "register") loadCourseOptions();
+  if (tab === "overview") { oPage = 0; loadOverview(); }
+  if (tab === "admin") checkAdmin();
+}
+window.addEventListener("hashchange", () => route());
+document.querySelectorAll("nav a").forEach(a => a.addEventListener("click", (e) => {
+  e.preventDefault();
+  try { history.replaceState(null, "", "#" + a.dataset.tab); } catch (err) { /* 미리보기 환경에서는 무시 */ }
+  route(a.dataset.tab);
+}));
+
+/* ---------- 1. 이수 등록 ---------- */
+async function loadCourseOptions() {
+  const { data } = await sb.from("courses").select("id,title,is_active").order("id");
+  const list = data || [];
+  const keep = $("rCourse").value;
+  $("rCourse").innerHTML = '<option value="">과정을 선택하세요</option>' +
+    list.filter(c => c.is_active).map(c => `<option value="${c.id}">${esc(c.title)}</option>`).join("");
+  $("rCourse").value = keep;
+  $("oCourse").innerHTML = '<option value="">전체 과정</option>' +
+    list.map(c => `<option value="${c.id}">${esc(c.title)}</option>`).join("");
+  $("rDate").max = today();
+  if (!$("rDate").value) $("rDate").value = today();
+}
+$("btnSubmit").onclick = async () => {
+  const name = cleanName($("rName").value), pin = $("rPin").value, course = $("rCourse").value, date = $("rDate").value;
+  clearMsg($("rMsg"));
+  if (name.length < 2) return show($("rMsg"), "이름을 입력해 주세요.", "warn");
+  if (!/^\d{4}$/.test(pin)) return show($("rMsg"), "비밀번호는 숫자 4자리로 입력해 주세요.", "warn");
+  if (!course) return show($("rMsg"), "이수한 연수 과정을 선택해 주세요.", "warn");
+  if (!date) return show($("rMsg"), "이수 날짜를 입력해 주세요.", "warn");
+  if (date > today()) return show($("rMsg"), "이수 날짜는 오늘 이후로 입력할 수 없습니다.", "warn");
+  $("btnSubmit").disabled = true;
+  const { error } = await sb.rpc("submit_completion",
+    { p_name: name, p_pin: pin, p_course_id: Number(course), p_completed_date: date });
+  $("btnSubmit").disabled = false;
+  if (error) {
+    return show($("rMsg"), error.code === "23505"
+      ? "이미 같은 이름, 과정, 날짜로 등록되어 있습니다."
+      : "등록하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해 주세요.", "warn");
+  }
+  const label = $("rCourse").selectedOptions[0].textContent;
+  show($("rMsg"), `${name} 선생님의 "${label}" 이수가 등록되었습니다. ‘내 이수 현황’에서 확인할 수 있습니다.`, "ok");
+  $("rCourse").value = ""; $("rPin").value = ""; $("rName").value = ""; $("rName").focus();
+};
+
+/* ---------- 2. 내 이수 현황 ---------- */
+$("btnMine").onclick = async () => {
+  const name = cleanName($("mName").value), pin = $("mPin").value;
+  clearMsg($("mMsg")); $("mResult").classList.add("hidden");
+  if (name.length < 2 || !/^\d{4}$/.test(pin)) return show($("mMsg"), "이름과 숫자 4자리 비밀번호를 입력해 주세요.", "warn");
+  const { data, error } = await sb.rpc("my_completions", { p_name: name, p_pin: pin });
+  if (error) return show($("mMsg"), "조회하지 못했습니다. 잠시 후 다시 시도해 주세요.", "warn");
+  if (!data.length) return show($("mMsg"), "일치하는 기록이 없습니다. 이름과 비밀번호를 확인해 주세요.", "warn");
+  $("mSummary").textContent = `${name} 선생님의 이수 기록 ${data.length}건`;
+  $("mRows").innerHTML = data.map(r =>
+    `<tr><td class="course">${esc(r.course_title)}</td><td>${r.completed_date}</td></tr>`).join("");
+  $("mResult").classList.remove("hidden");
+};
+$("mPin").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btnMine").click(); });
+
+/* ---------- 3. 전체 현황 (마스킹된 이름) ---------- */
+const OPAGE = 20; let oPage = 0;
+async function loadOverview() {
+  await loadCourseOptions();
+  const cid = $("oCourse").value;
+  const cArg = cid ? Number(cid) : null;
+  const [{ data, error }, stats] = await Promise.all([
+    sb.rpc("public_overview", { p_course_id: cArg, p_limit: OPAGE, p_offset: oPage * OPAGE }),
+    sb.rpc("public_overview_stats", { p_course_id: cArg }),
+  ]);
+  if (error) { $("oSummary").textContent = "현황을 불러오지 못했습니다."; return; }
+  const persons = stats.data && stats.data.length ? Number(stats.data[0].person_count) : 0;
+  const total = data.length ? Number(data[0].total_count) : 0;
+  $("oRows").innerHTML = data.map(r => `<tr>
+    <td>${esc(r.masked_name)}</td><td class="course">${esc(r.course_title)}</td><td>${r.completed_date}</td></tr>`).join("");
+  $("oEmpty").classList.toggle("hidden", data.length > 0);
+  $("oSummary").innerHTML = `이수자 <strong>${persons}명</strong> · 이수 기록 ${total}건`;
+  const pages = Math.max(1, Math.ceil(total / OPAGE));
+  $("oPageInfo").textContent = `${oPage + 1} / ${pages}`;
+  $("oPrev").disabled = oPage === 0;
+  $("oNext").disabled = oPage + 1 >= pages;
+}
+$("oCourse").onchange = () => { oPage = 0; loadOverview(); };
+$("oPrev").onclick = () => { oPage--; loadOverview(); };
+$("oNext").onclick = () => { oPage++; loadOverview(); };
+
+/* ---------- 4. 연수 담당자: 비밀번호 확인 ---------- */
+let adminPin = null;   // 화면을 닫거나 새로고침하면 사라짐
+function checkAdmin() {
+  $("adminLogin").classList.toggle("hidden", !!adminPin);
+  $("adminPanel").classList.toggle("hidden", !adminPin);
+  if (adminPin) { page = 0; loadCourses(); loadList(); }
+}
+async function adminRpc(fn, args) {
+  const res = await sb.rpc(fn, { p_pin: adminPin, ...args });
+  if (res.error && res.error.code === "28000") { adminPin = null; checkAdmin(); }
+  return res;
+}
+$("btnLogin").onclick = async () => {
+  clearMsg($("loginMsg"));
+  const pw = $("password").value;
+  const { data, error } = await sb.rpc("admin_check", { p_pin: pw });
+  if (error) return show($("loginMsg"), "확인하지 못했습니다. 잠시 후 다시 시도해 주세요.", "warn");
+  if (data !== true) return show($("loginMsg"), "비밀번호가 맞지 않습니다.", "warn");
+  adminPin = pw; $("password").value = ""; checkAdmin();
+};
+$("password").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btnLogin").click(); });
+$("btnLogout").onclick = () => { adminPin = null; checkAdmin(); };
+
+/* ---------- 4. 연수 담당자: 과정 관리 ---------- */
+async function loadCourses() {
+  const { data } = await sb.from("courses").select("*").order("id");
+  $("cRows").innerHTML = (data || []).map(c => `<tr>
+    <td class="course">${esc(c.title)}</td>
+    <td><span class="tag">${c.is_active ? "선택 가능" : "숨김"}</span></td>
+    <td><button class="small" data-toggle="${c.id}" data-active="${c.is_active}">${c.is_active ? "숨기기" : "다시 표시"}</button></td>
+  </tr>`).join("");
+}
+$("btnAddCourse").onclick = async () => {
+  const title = $("newCourse").value.trim(); clearMsg($("cMsg"));
+  if (!title) return show($("cMsg"), "연수 과정 이름을 입력하세요.", "warn");
+  const { error } = await adminRpc("admin_add_course", { p_title: title });
+  if (error) return show($("cMsg"), error.code === "23505" ? "이미 있는 과정입니다." : "추가하지 못했습니다.", "warn");
+  show($("cMsg"), `"${title}" 과정을 추가했습니다.`, "ok"); $("newCourse").value = ""; loadCourses();
+};
+$("cRows").addEventListener("click", async (e) => {
+  const id = e.target.dataset.toggle; if (!id) return;
+  await adminRpc("admin_set_course_active", { p_id: Number(id), p_active: e.target.dataset.active !== "true" });
+  loadCourses();
+});
+
+/* ---------- 4. 연수 담당자: 검색/목록 ---------- */
+const PAGE = 20; let page = 0, sortCol = "completed_date", sortAsc = false, pendingCancelId = null;
+async function loadList() {
+  const { data, error } = await adminRpc("admin_list_completions", {
+    p_name: $("sName").value.trim() || null,
+    p_course: $("sCourse").value.trim() || null,
+    p_from: $("sFrom").value || null,
+    p_to: $("sTo").value || null,
+    p_include_cancelled: $("sCancelled").checked,
+    p_sort: sortCol, p_asc: sortAsc, p_limit: PAGE, p_offset: page * PAGE,
+  });
+  if (error) { $("summary").textContent = "목록을 불러오지 못했습니다."; return; }
+  const total = data.length ? Number(data[0].total_count) : 0;
+  $("rows").innerHTML = data.map(r => `
+    <tr class="${r.status === "cancelled" ? "cancelled" : ""}">
+      <td>${esc(r.teacher_name)}</td>
+      <td class="course">${esc(r.course_title)}</td>
+      <td>${r.completed_date}</td>
+      <td><span class="tag">${r.status === "active" ? "이수" : "취소됨"}</span></td>
+      <td>${r.status === "active"
+        ? `<button class="small danger" data-cancel="${r.id}" data-label="${esc(r.teacher_name)} / ${esc(r.course_title)}">취소</button>`
+        : `<button class="small" data-restore="${r.id}">복구</button>`}</td>
+    </tr>`).join("");
+  $("empty").classList.toggle("hidden", data.length > 0);
+  $("summary").textContent = `총 ${total}건`;
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  $("pageInfo").textContent = `${page + 1} / ${pages}`;
+  $("btnPrev").disabled = page === 0;
+  $("btnNext").disabled = page + 1 >= pages;
+}
+$("btnSearch").onclick = () => { page = 0; loadList(); };
+["sName", "sCourse"].forEach(id => $(id).addEventListener("keydown", e => { if (e.key === "Enter") $("btnSearch").click(); }));
+$("sCancelled").onchange = () => { page = 0; loadList(); };
+$("btnReset").onclick = () => {
+  ["sName", "sCourse", "sFrom", "sTo"].forEach(id => $(id).value = "");
+  $("sCancelled").checked = false; page = 0; loadList();
+};
+$("btnPrev").onclick = () => { page--; loadList(); };
+$("btnNext").onclick = () => { page++; loadList(); };
+document.querySelectorAll("th.sort").forEach(th => th.onclick = () => {
+  const col = th.dataset.col;
+  sortAsc = sortCol === col ? !sortAsc : true; sortCol = col; page = 0; loadList();
+});
+
+/* ---------- 4. 연수 담당자: 취소/복구 ---------- */
+$("rows").addEventListener("click", async (e) => {
+  const cancelId = e.target.dataset.cancel, restoreId = e.target.dataset.restore;
+  if (cancelId) {
+    pendingCancelId = Number(cancelId);
+    $("cancelText").textContent = e.target.dataset.label;
+    $("cancelReason").value = "";
+    $("dlgCancel").showModal();
+  }
+  if (restoreId) { await adminRpc("admin_restore", { p_id: Number(restoreId) }); loadList(); }
+});
+$("btnCancelClose").onclick = () => $("dlgCancel").close();
+$("btnCancelOk").onclick = async () => {
+  await adminRpc("admin_cancel", { p_id: pendingCancelId, p_reason: $("cancelReason").value });
+  $("dlgCancel").close(); loadList();
+};
+
+route();
+</script>
+</body>
+</html>
